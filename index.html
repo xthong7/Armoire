@@ -409,6 +409,7 @@ function previewImg(e) {
 function addItem(btn) {
   const name = document.getElementById('item-name').value.trim();
   if (!name) { showToast('Please add a name', '!'); return; }
+  // Push to state immediately — no setTimeout delay
   wardrobe.push({
     name,
     brand:    document.getElementById('item-brand').value.trim(),
@@ -418,8 +419,9 @@ function addItem(btn) {
     id:       Date.now()
   });
   saveWardrobe();
+  flashBtn(btn, '#1a3a1a', 'white');
   closeAllOverlays();
-  renderWardrobe();
+  renderWardrobe(); // full rewrite immediately — same pattern as renderSaved
   showToast(name + ' added to wardrobe', '✓');
 }
 
