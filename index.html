@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Armoire">
+<meta name="theme-color" content="#F7F4EF">
+<title>Armoire</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --cream: #F7F4EF; --sand: #EDE8E0; --mink: #C4B9AC;
+    --stone: #8C7E72; --espresso: #2C2420; --blush: #E8D5C8;
+    --font-display: 'Cormorant Garamond', serif; --font-body: 'Jost', sans-serif;
+  }
+  html, body { height: 100%; overflow: hidden; background: var(--cream); }
+  body { font-family: var(--font-body); color: var(--espresso); font-weight: 300; display: flex; flex-direction: column; }
+  .status-bar-spacer { height: env(safe-area-inset-top); background: var(--cream); flex-shrink: 0; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.2rem; border-bottom: 0.5px solid var(--mink); background: var(--cream); flex-shrink: 0; z-index: 100; }
+  .nav-logo { font-family: var(--font-display); font-size: 1.3rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; }
+  .nav-tabs { display: flex; gap: 1.4rem; }
+  .nav-tab { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone); cursor: pointer; padding: 0.2rem 0; border-bottom: 1px solid transparent; transition: all 0.15s; font-weight: 300; user-select: none; }
+  .nav-tab.active { color: var(--espresso); border-bottom-color: var(--espresso); }
+  .nav-tab:active { opacity: 0.5; transform: scale(0.95); }
+  .app-body { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; background: var(--cream); position: relative; }
+  .screen { display: block; position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; pointer-events: none; }
+  .screen.active { visibility: visible; pointer-events: auto; position: relative; }
+  .wardrobe-header { padding: 1.5rem 1.2rem 1rem; border-bottom: 0.5px solid var(--sand); display: flex; justify-content: space-between; align-items: flex-end; }
+  .wardrobe-title { font-family: var(--font-display); font-size: 2.2rem; font-weight: 300; font-style: italic; }
+  .wardrobe-count { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); padding-bottom: 0.4rem; }
+  .categories-bar { display: flex; padding: 0 1.2rem; border-bottom: 0.5px solid var(--sand); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; background: var(--cream); position: sticky; top: 0; z-index: 10; }
+  .categories-bar::-webkit-scrollbar { display: none; }
+  .cat-btn { font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; padding: 0.85rem 1rem; cursor: pointer; color: var(--stone); border-bottom: 1.5px solid transparent; white-space: nowrap; transition: all 0.15s; font-weight: 300; background: none; border-left: none; border-right: none; border-top: none; font-family: var(--font-body); }
+  .cat-btn.active { color: var(--espresso); border-bottom-color: var(--espresso); }
+  .cat-btn:active { opacity: 0.5; transform: scale(0.95); }
+  .clothes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--sand); }
+  .item-card { background: var(--cream); cursor: pointer; position: relative; overflow: hidden; aspect-ratio: 3/4; transition: opacity 0.15s; }
+  .item-card:active { opacity: 0.75; }
+  .item-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item-img-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--sand); }
+  .item-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 1.5rem 0.6rem 0.5rem; background: linear-gradient(transparent, rgba(44,36,32,0.6)); color: white; }
+  .item-name { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 300; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-brand { font-size: 0.52rem; opacity: 0.75; letter-spacing: 0.08em; }
+  .item-delete { position: absolute; top: 0.4rem; right: 0.4rem; width: 26px; height: 26px; background: rgba(247,244,239,0.92); border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--espresso); transition: transform 0.12s, background 0.12s; }
+  .item-delete:active { transform: scale(0.82); background: #8B2020; color: white; }
+  .add-card { background: var(--cream); aspect-ratio: 3/4; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 8px; transition: background 0.15s, transform 0.12s; }
+  .add-card:active { background: var(--sand); transform: scale(0.97); }
+  .add-icon { width: 32px; height: 32px; border: 1px solid var(--mink); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--stone); font-size: 18px; }
+  .add-label { font-size: 0.55rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone); }
+  .builder-wrap { display: flex; flex-direction: column; }
+  .builder-header { padding: 1.2rem; border-bottom: 0.5px solid var(--sand); }
+  .builder-title { font-family: var(--font-display); font-size: 1.8rem; font-weight: 300; font-style: italic; }
+  .builder-sub { font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone); margin-top: 0.15rem; }
+  .outfit-canvas { display: grid; grid-template-rows: 1fr 1.2fr 1fr; gap: 1px; background: var(--sand); margin: 0.8rem 1rem; border-radius: 2px; overflow: hidden; min-height: 320px; }
+  .outfit-row { display: grid; gap: 1px; background: var(--sand); }
+  .outfit-row.row-2 { grid-template-columns: 1fr 1fr; }
+  .outfit-row.row-1 { grid-template-columns: 1fr; }
+  .outfit-slot { background: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; min-height: 90px; transition: background 0.15s; }
+  .outfit-slot.selected { outline: 2px solid var(--espresso); outline-offset: -2px; }
+  .outfit-slot:active { background: var(--blush); }
+  .slot-label { font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone); position: absolute; top: 0.4rem; left: 0.5rem; z-index: 2; }
+  .slot-item-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--sand); transition: transform 0.2s; transform-origin: center center; }
+  .slot-ph { font-size: 22px; opacity: 0.12; }
+  .slot-remove { position: absolute; top: 0.3rem; right: 0.3rem; background: rgba(247,244,239,0.9); border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px; display: flex; align-items: center; justify-content: center; z-index: 3; color: var(--espresso); transition: transform 0.12s, background 0.12s; }
+  .slot-remove:active { transform: scale(0.82); background: #8B2020; color: white; }
+  .slot-zoom-controls { position: absolute; bottom: 0.3rem; left: 50%; transform: translateX(-50%); display: none; gap: 3px; z-index: 3; align-items: center; }
+  .slot-zoom-btn { background: rgba(247,244,239,0.92); border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; color: var(--espresso); transition: transform 0.12s, background 0.12s; }
+  .slot-zoom-btn:active { transform: scale(0.82); background: var(--espresso); color: var(--cream); }
+  .slot-fit-btn { background: rgba(247,244,239,0.92); border: none; border-radius: 10px; padding: 0 5px; height: 20px; cursor: pointer; font-size: 0.42rem; letter-spacing: 0.1em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; color: var(--espresso); font-family: var(--font-body); white-space: nowrap; transition: transform 0.12s, background 0.12s; }
+  .slot-fit-btn:active { transform: scale(0.88); background: var(--espresso); color: var(--cream); }
+  .outfit-slot.selected .slot-zoom-controls, .outfit-slot.has-item .slot-zoom-controls { display: flex; }
+  .panel-section { padding: 0.8rem 1rem; border-top: 0.5px solid var(--sand); }
+  .panel-title { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--espresso); margin-bottom: 0.2rem; font-weight: 400; }
+  .panel-subtitle { font-size: 0.54rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); margin-bottom: 0.8rem; }
+  .panel-items-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+  .panel-items-row::-webkit-scrollbar { display: none; }
+  .panel-item { flex-shrink: 0; width: 72px; height: 96px; background: var(--sand); cursor: pointer; position: relative; overflow: hidden; border-radius: 1px; transition: transform 0.12s, opacity 0.12s; }
+  .panel-item:active { transform: scale(0.92); opacity: 0.7; }
+  .panel-item img { width: 100%; height: 100%; object-fit: cover; }
+  .panel-item-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.8rem 0.25rem 0.2rem; background: linear-gradient(transparent, rgba(44,36,32,0.55)); font-size: 0.46rem; letter-spacing: 0.08em; text-transform: uppercase; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel-empty { font-size: 0.6rem; color: var(--mink); letter-spacing: 0.1em; text-transform: uppercase; padding: 0.5rem 0; }
+  .panel-prompt { font-family: var(--font-display); font-size: 1rem; font-style: italic; color: var(--mink); padding: 1.5rem 0; text-align: center; }
+  .save-row { padding: 0.8rem 1rem 1rem; display: flex; gap: 8px; border-top: 0.5px solid var(--sand); }
+  .save-input { flex: 1; border: 0.5px solid var(--mink); background: none; padding: 0.6rem 0.8rem; font-family: var(--font-body); font-size: 0.8rem; color: var(--espresso); outline: none; font-weight: 300; }
+  .save-input:focus { border-color: var(--espresso); }
+  .btn-save { padding: 0.6rem 1rem; background: var(--espresso); color: var(--cream); border: none; font-family: var(--font-body); font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; font-weight: 300; white-space: nowrap; transition: transform 0.12s, opacity 0.12s, background 0.12s; }
+  .btn-save:active { transform: scale(0.94); opacity: 0.65; background: #1a0e0b; }
+  .btn-clear { padding: 0.6rem 0.8rem; background: none; color: var(--stone); border: 0.5px solid var(--mink); font-family: var(--font-body); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, opacity 0.12s; }
+  .btn-clear:active { transform: scale(0.94); opacity: 0.55; }
+  .saved-header { padding: 1.5rem 1.2rem 1rem; border-bottom: 0.5px solid var(--sand); }
+  .saved-title { font-family: var(--font-display); font-size: 2.2rem; font-weight: 300; font-style: italic; }
+  .saved-sub { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-top: 0.15rem; }
+  .saved-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--sand); }
+  .saved-card { background: var(--cream); cursor: pointer; transition: opacity 0.15s, transform 0.12s; }
+  .saved-card:active { opacity: 0.75; transform: scale(0.97); }
+  .saved-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--sand); aspect-ratio: 1; }
+  .saved-cell { background: var(--cream); overflow: hidden; } .saved-cell.empty { background: var(--sand); }
+  .saved-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .saved-info { padding: 0.6rem 0.7rem; border-top: 0.5px solid var(--sand); display: flex; justify-content: space-between; align-items: center; }
+  .saved-name { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+  .saved-date { font-size: 0.55rem; color: var(--stone); }
+  .look-overlay { position: fixed; inset: 0; background: var(--cream); z-index: 500; display: none; flex-direction: column; }
+  .look-overlay.open { display: flex; }
+  .look-overlay-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.2rem; padding-top: calc(1rem + env(safe-area-inset-top)); border-bottom: 0.5px solid var(--sand); flex-shrink: 0; }
+  .look-overlay-name { font-family: var(--font-display); font-size: 1.6rem; font-weight: 300; font-style: italic; }
+  .look-overlay-date { font-size: 0.55rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); margin-top: 0.1rem; }
+  .look-overlay-close { background: none; border: none; font-size: 1.1rem; color: var(--stone); cursor: pointer; padding: 0.4rem 0.6rem; transition: transform 0.12s, opacity 0.12s; }
+  .look-overlay-close:active { transform: scale(0.82); opacity: 0.5; }
+  .look-overlay-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .look-slots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--sand); }
+  .look-slot-cell { background: var(--cream); position: relative; aspect-ratio: 3/4; overflow: hidden; }
+  .look-slot-cell img { width: 100%; height: 100%; object-fit: contain; background: var(--sand); display: block; }
+  .look-slot-label { position: absolute; bottom: 0; left: 0; right: 0; padding: 1.5rem 0.6rem 0.45rem; background: linear-gradient(transparent, rgba(44,36,32,0.65)); color: white; }
+  .look-slot-cat { font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8; }
+  .look-slot-name { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 300; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .look-slot-brand { font-size: 0.52rem; opacity: 0.7; }
+  .look-overlay-footer { padding: 0.8rem 1.2rem; padding-bottom: calc(0.8rem + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--sand); flex-shrink: 0; }
+  .look-del-btn { width: 100%; padding: 0.85rem; background: none; color: #8B2020; border: 0.5px solid #8B2020; font-family: var(--font-body); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, background 0.12s, color 0.12s; }
+  .look-del-btn:active { transform: scale(0.96); background: #8B2020; color: white; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(44,36,32,0.5); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--cream); width: 100%; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 12px 12px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .modal-handle { width: 36px; height: 4px; background: var(--mink); border-radius: 2px; margin: 0.7rem auto 0; }
+  .modal-header { padding: 1rem 1.2rem 0.8rem; border-bottom: 0.5px solid var(--sand); display: flex; justify-content: space-between; align-items: center; }
+  .modal-title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 300; font-style: italic; }
+  .modal-close { background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--stone); padding: 0.2rem; transition: transform 0.12s, opacity 0.12s; }
+  .modal-close:active { transform: scale(0.82); opacity: 0.5; }
+  .modal-body { padding: 1rem 1.2rem; }
+  .form-group { margin-bottom: 1rem; }
+  .form-label { display: block; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--stone); margin-bottom: 0.4rem; }
+  .form-input { width: 100%; border: 0.5px solid var(--mink); background: none; padding: 0.65rem 0.8rem; font-family: var(--font-body); font-size: 16px; color: var(--espresso); outline: none; font-weight: 300; border-radius: 0; -webkit-appearance: none; }
+  .form-input:focus { border-color: var(--espresso); }
+  .form-select { width: 100%; border: 0.5px solid var(--mink); background: var(--cream); padding: 0.65rem 0.8rem; font-family: var(--font-body); font-size: 16px; color: var(--espresso); outline: none; font-weight: 300; -webkit-appearance: none; border-radius: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238C7E72' stroke-width='1.2' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8rem center; }
+  .upload-area { border: 1px dashed var(--mink); padding: 1.5rem; text-align: center; cursor: pointer; position: relative; transition: background 0.15s; }
+  .upload-area:active { background: var(--sand); }
+  .upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-text { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
+  .upload-preview { width: 100%; max-height: 180px; object-fit: contain; margin-top: 0.7rem; display: none; }
+  .modal-footer { padding: 0.8rem 1.2rem 1rem; display: flex; gap: 8px; }
+  .btn-primary { flex: 1; padding: 0.85rem; background: var(--espresso); color: var(--cream); border: none; font-family: var(--font-body); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, opacity 0.12s, background 0.12s; }
+  .btn-primary:active { transform: scale(0.95); opacity: 0.7; background: #1a0e0b; }
+  .btn-secondary { padding: 0.85rem 1rem; background: none; color: var(--stone); border: 0.5px solid var(--mink); font-family: var(--font-body); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, opacity 0.12s; }
+  .btn-secondary:active { transform: scale(0.95); opacity: 0.55; }
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(44,36,32,0.45); z-index: 400; display: none; align-items: flex-end; justify-content: center; }
+  .confirm-overlay.open { display: flex; }
+  .confirm-box { background: var(--cream); width: 100%; border-radius: 12px 12px 0 0; padding: 1.4rem 1.2rem calc(1.2rem + env(safe-area-inset-bottom)); }
+  .confirm-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 300; font-style: italic; margin-bottom: 0.3rem; }
+  .confirm-sub { font-size: 0.62rem; letter-spacing: 0.12em; color: var(--stone); margin-bottom: 1.2rem; text-transform: uppercase; }
+  .confirm-btns { display: flex; gap: 8px; }
+  .confirm-delete { flex: 1; padding: 0.85rem; background: #8B2020; color: white; border: none; font-family: var(--font-body); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, opacity 0.12s, background 0.12s; }
+  .confirm-delete:active { transform: scale(0.95); opacity: 0.7; background: #6a1818; }
+  .confirm-cancel { flex: 1; padding: 0.85rem; background: none; color: var(--stone); border: 0.5px solid var(--mink); font-family: var(--font-body); font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; font-weight: 300; transition: transform 0.12s, opacity 0.12s; }
+  .confirm-cancel:active { transform: scale(0.95); opacity: 0.55; }
+  .toast { position: fixed; bottom: calc(1.5rem + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(80px); background: var(--espresso); color: var(--cream); padding: 0.7rem 1.4rem; font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; z-index: 600; transition: transform 0.3s ease; pointer-events: none; white-space: nowrap; border-radius: 2px; display: flex; align-items: center; gap: 7px; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast-icon { font-size: 13px; }
+  .empty-state { padding: 4rem 1.5rem; text-align: center; grid-column: 1/-1; }
+  .empty-state-title { font-family: var(--font-display); font-size: 1.6rem; font-weight: 300; font-style: italic; color: var(--stone); margin-bottom: 0.4rem; }
+  .empty-state-sub { font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mink); }
+  .bottom-safe { height: env(safe-area-inset-bottom); background: var(--cream); flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="status-bar-spacer"></div>
+<nav>
+  <div class="nav-logo">Armoire</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showScreen('wardrobe',this)">Wardrobe</div>
+    <div class="nav-tab" onclick="showScreen('builder',this)">Builder</div>
+    <div class="nav-tab" onclick="showScreen('saved',this)">Saved</div>
+  </div>
+</nav>
+<div class="app-body">
+  <div class="screen active" id="screen-wardrobe">
+    <div class="wardrobe-header">
+      <div class="wardrobe-title">My Wardrobe</div>
+      <div class="wardrobe-count" id="wardrobe-count">0 pieces</div>
+    </div>
+    <div class="categories-bar">
+      <button class="cat-btn active" onclick="filterCat('All',this)">All</button>
+      <button class="cat-btn" onclick="filterCat('Tops',this)">Tops</button>
+      <button class="cat-btn" onclick="filterCat('Bottoms',this)">Bottoms</button>
+      <button class="cat-btn" onclick="filterCat('Dresses',this)">Dresses</button>
+      <button class="cat-btn" onclick="filterCat('Outerwear',this)">Outerwear</button>
+      <button class="cat-btn" onclick="filterCat('Knitwear',this)">Knitwear</button>
+      <button class="cat-btn" onclick="filterCat('Shoes',this)">Shoes</button>
+      <button class="cat-btn" onclick="filterCat('Bags',this)">Bags</button>
+      <button class="cat-btn" onclick="filterCat('Accessories',this)">Accessories</button>
+      <button class="cat-btn" onclick="filterCat('Swimwear',this)">Swimwear</button>
+    </div>
+    <div style="background:var(--sand)"><div class="clothes-grid" id="clothes-grid"></div></div>
+  </div>
+  <div class="screen" id="screen-builder">
+    <div class="builder-wrap">
+      <div class="builder-header">
+        <div class="builder-title">Outfit Builder</div>
+        <div class="builder-sub">Tap a slot to choose pieces for it</div>
+      </div>
+      <div class="outfit-canvas">
+        <div class="outfit-row row-2">
+          <div class="outfit-slot" id="slot-outerwear" onclick="setActiveSlot('outerwear',this)">
+            <span class="slot-label">Outerwear</span><div class="slot-ph">🧥</div>
+            <button class="slot-remove" onclick="removeSlot('outerwear',event)">✕</button>
+            <div class="slot-zoom-controls">
+              <button class="slot-zoom-btn" onclick="zoomSlot('outerwear',-0.2,event)">−</button>
+              <button class="slot-fit-btn" onclick="toggleFit('outerwear',event)">fit</button>
+              <button class="slot-zoom-btn" onclick="zoomSlot('outerwear',0.2,event)">+</button>
+            </div>
+          </div>
+          <div class="outfit-slot" id="slot-top" onclick="setActiveSlot('top',this)">
+            <span class="slot-label">Top</span><div class="slot-ph">👚</div>
+            <button class="slot-remove" onclick="removeSlot('top',event)">✕</button>
+            <div class="slot-zoom-controls">
+              <button class="slot-zoom-btn" onclick="zoomSlot('top',-0.2,event)">−</button>
+              <button class="slot-fit-btn" onclick="toggleFit('top',event)">fit</button>
+              <button class="slot-zoom-btn" onclick="zoomSlot('top',0.2,event)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="outfit-row row-1">
+          <div class="outfit-slot" id="slot-bottom" onclick="setActiveSlot('bottom',this)">
+            <span class="slot-label">Bottom / Dress</span><div class="slot-ph">👗</div>
+            <button class="slot-remove" onclick="removeSlot('bottom',event)">✕</button>
+            <div class="slot-zoom-controls">
+              <button class="slot-zoom-btn" onclick="zoomSlot('bottom',-0.2,event)">−</button>
+              <button class="slot-fit-btn" onclick="toggleFit('bottom',event)">fit</button>
+              <button class="slot-zoom-btn" onclick="zoomSlot('bottom',0.2,event)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="outfit-row row-2">
+          <div class="outfit-slot" id="slot-shoes" onclick="setActiveSlot('shoes',this)">
+            <span class="slot-label">Shoes</span><div class="slot-ph">👠</div>
+            <button class="slot-remove" onclick="removeSlot('shoes',event)">✕</button>
+            <div class="slot-zoom-controls">
+              <button class="slot-zoom-btn" onclick="zoomSlot('shoes',-0.2,event)">−</button>
+              <button class="slot-fit-btn" onclick="toggleFit('shoes',event)">fit</button>
+              <button class="slot-zoom-btn" onclick="zoomSlot('shoes',0.2,event)">+</button>
+            </div>
+          </div>
+          <div class="outfit-slot" id="slot-bag" onclick="setActiveSlot('bag',this)">
+            <span class="slot-label">Bag</span><div class="slot-ph">👜</div>
+            <button class="slot-remove" onclick="removeSlot('bag',event)">✕</button>
+            <div class="slot-zoom-controls">
+              <button class="slot-zoom-btn" onclick="zoomSlot('bag',-0.2,event)">−</button>
+              <button class="slot-fit-btn" onclick="toggleFit('bag',event)">fit</button>
+              <button class="slot-zoom-btn" onclick="zoomSlot('bag',0.2,event)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-title" id="panel-title">Select a slot above</div>
+        <div class="panel-subtitle" id="panel-subtitle">Tap any slot to see matching pieces</div>
+        <div class="panel-items-row" id="panel-items"><div class="panel-prompt">Tap a slot above to begin</div></div>
+      </div>
+      <div class="save-row">
+        <input class="save-input" id="outfit-name" placeholder="Name this look...">
+        <button class="btn-clear" onclick="clearOutfit()">Clear</button>
+        <button class="btn-save" onclick="saveOutfit(this)">Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="screen" id="screen-saved">
+    <div class="saved-header">
+      <div class="saved-title">Saved Looks</div>
+      <div class="saved-sub" id="saved-sub">0 outfits</div>
+    </div>
+    <div style="background:var(--sand)"><div class="saved-grid" id="saved-grid"></div></div>
+  </div>
+</div>
+<div class="bottom-safe"></div>
+
+<div class="look-overlay" id="look-overlay">
+  <div class="look-overlay-header">
+    <div>
+      <div class="look-overlay-name" id="look-overlay-name"></div>
+      <div class="look-overlay-date" id="look-overlay-date"></div>
+    </div>
+    <button class="look-overlay-close" onclick="closeLook()">✕</button>
+  </div>
+  <div class="look-overlay-body"><div class="look-slots-grid" id="look-slots-grid"></div></div>
+  <div class="look-overlay-footer"><button class="look-del-btn" id="look-del-btn">Remove this look</button></div>
+</div>
+
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Add New Piece</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Photo</label>
+        <div class="upload-area">
+          <div class="upload-text">Tap to upload from camera roll</div>
+          <img id="upload-preview" class="upload-preview">
+          <input type="file" accept="image/*" onchange="previewImg(event)">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Item Name</label><input class="form-input" id="item-name" placeholder="e.g. Silk camisole" autocomplete="off"></div>
+      <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="item-brand" placeholder="e.g. Totême" autocomplete="off"></div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="item-category">
+          <option>Tops</option><option>Bottoms</option><option>Dresses</option>
+          <option>Outerwear</option><option>Knitwear</option><option>Shoes</option>
+          <option>Bags</option><option>Accessories</option><option>Swimwear</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Colour</label><input class="form-input" id="item-color" placeholder="e.g. Ivory" autocomplete="off"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="addItem(this)">Add to Wardrobe</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Remove this piece?</div>
+    <div class="confirm-sub" id="confirm-sub"></div>
+    <div class="confirm-btns">
+      <button class="confirm-delete" id="confirm-ok">Remove</button>
+      <button class="confirm-cancel" onclick="closeConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="toast-icon" id="toast-icon"></span><span id="toast-msg"></span></div>
+
+<script>
+let wardrobe = JSON.parse(localStorage.getItem('armoire_wardrobe') || '[]');
+let savedOutfits = JSON.parse(localStorage.getItem('armoire_outfits') || '[]');
+let currentFilter = 'All', activeSlot = null, pendingImage = null;
+let currentOutfit = { outerwear:null, top:null, bottom:null, shoes:null, bag:null };
+let slotZoom = { outerwear:1, top:1, bottom:1, shoes:1, bag:1 };
+let slotFit = { outerwear:'contain', top:'contain', bottom:'contain', shoes:'contain', bag:'contain' };
+const slotIcons = { outerwear:'🧥', top:'👚', bottom:'👗', shoes:'👠', bag:'👜' };
+const slotLabels = { outerwear:'Outerwear', top:'Top', bottom:'Bottom / Dress', shoes:'Shoes', bag:'Bag' };
+const slotCategories = {
+  outerwear: ['Outerwear'],
+  top:       ['Tops', 'Knitwear'],
+  bottom:    ['Bottoms', 'Dresses'],
+  shoes:     ['Shoes'],
+  bag:       ['Bags', 'Accessories']
+};
+
+function showToast(msg, icon) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = icon || '';
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function flashBtn(el, bg, fg) {
+  if (!el) return;
+  const ob = el.style.background, of = el.style.color;
+  el.style.transition = 'background 0.08s, transform 0.08s, color 0.08s';
+  el.style.transform = 'scale(0.94)';
+  el.style.background = bg || '#1a3a1a';
+  el.style.color = fg || 'white';
+  setTimeout(() => { el.style.transform = ''; el.style.background = ob; el.style.color = of; }, 220);
+}
+
+function closeAllOverlays() {
+  document.getElementById('modal-add').classList.remove('open');
+  document.getElementById('confirm-overlay').classList.remove('open');
+  document.getElementById('look-overlay').classList.remove('open');
+  confirmCallback = null;
+}
+
+let confirmCallback = null;
+function showConfirm(title, sub, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-sub').textContent = sub;
+  confirmCallback = cb;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  confirmCallback = null;
+}
+document.getElementById('confirm-ok').addEventListener('click', () => {
+  flashBtn(document.getElementById('confirm-ok'), '#6a1818', 'white');
+  setTimeout(() => { if (confirmCallback) confirmCallback(); closeConfirm(); }, 220);
+});
+document.getElementById('confirm-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeConfirm();
+});
+
+function showScreen(name, tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  if (tab) tab.classList.add('active');
+  document.querySelector('.app-body').scrollTop = 0;
+  renderGrid();
+  renderSaved();
+}
+
+function filterCat(cat, btn) {
+  currentFilter = cat;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('clothes-grid');
+  const filtered = currentFilter === 'All' ? wardrobe : wardrobe.filter(i => i.category === currentFilter);
+  // CHANGE: pass currentFilter to openModal so + card pre-selects the right category
+  const catArg = currentFilter !== 'All' ? `'${currentFilter}'` : '';
+  let html = '';
+  filtered.forEach(item => {
+    const ri = wardrobe.indexOf(item);
+    html += `<div class="item-card">
+      ${item.image ? `<img class="item-img" src="${item.image}">` : `<div class="item-img-placeholder"><svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="12" width="24" height="20" rx="2" stroke="#C4B9AC" stroke-width="1.2"/><path d="M8 17h24M14 12V10a2 2 0 014 0v2" stroke="#C4B9AC" stroke-width="1.2"/></svg></div>`}
+      <div class="item-label">
+        <div class="item-name">${item.name}</div>
+        ${item.brand ? `<div class="item-brand">${item.brand}</div>` : ''}
+      </div>
+      <button class="item-delete" onclick="removeItem(${ri},event)">✕</button>
+    </div>`;
+  });
+  // CHANGE: openModal now receives the category to pre-select
+  html += `<div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
+  if (filtered.length === 0 && currentFilter !== 'All') {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-state-title">No ${currentFilter} yet</div><div class="empty-state-sub">Tap + to add</div></div><div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
+    document.getElementById('wardrobe-count').textContent = wardrobe.length + ' pieces';
+    return;
+  }
+  grid.innerHTML = html;
+  const c = wardrobe.length;
+  document.getElementById('wardrobe-count').textContent = c + (c === 1 ? ' piece' : ' pieces');
+}
+
+function removeItem(idx, e) {
+  e.stopPropagation();
+  const name = wardrobe[idx].name;
+  showConfirm('Remove this piece?', name, () => {
+    wardrobe.splice(idx, 1);
+    localStorage.setItem('armoire_wardrobe', JSON.stringify(wardrobe));
+    renderGrid();
+    renderSaved();
+    showToast(name + ' removed', '✕');
+  });
+}
+
+function setActiveSlot(slot, el) {
+  activeSlot = slot;
+  document.querySelectorAll('.outfit-slot').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  const allowedCats = slotCategories[slot];
+  const filtered = wardrobe.filter(i => allowedCats.includes(i.category));
+  document.getElementById('panel-title').textContent = slotLabels[slot];
+  document.getElementById('panel-subtitle').textContent = 'Showing: ' + allowedCats.join(' / ');
+  const panel = document.getElementById('panel-items');
+  if (!filtered.length) {
+    panel.innerHTML = `<span class="panel-empty">No ${allowedCats.join(' / ')} in wardrobe yet</span>`;
+    return;
+  }
+  panel.innerHTML = filtered.map(item => {
+    const ri = wardrobe.indexOf(item);
+    return `<div class="panel-item" onclick="addToOutfit(${ri})">
+      ${item.image ? `<img src="${item.image}">` : `<div style="width:100%;height:100%;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.2">◻</div>`}
+      <div class="panel-item-label">${item.name}</div>
+    </div>`;
+  }).join('');
+}
+
+function zoomSlot(slot, delta, e) {
+  e.stopPropagation();
+  slotZoom[slot] = Math.min(3, Math.max(0.5, slotZoom[slot] + delta));
+  const img = document.querySelector('#slot-' + slot + ' .slot-item-img');
+  if (img) img.style.transform = 'scale(' + slotZoom[slot] + ')';
+}
+
+function toggleFit(slot, e) {
+  e.stopPropagation();
+  slotFit[slot] = slotFit[slot] === 'contain' ? 'cover' : 'contain';
+  const img = document.querySelector('#slot-' + slot + ' .slot-item-img');
+  const btn = document.querySelector('#slot-' + slot + ' .slot-fit-btn');
+  if (img) img.style.objectFit = slotFit[slot];
+  if (btn) btn.textContent = slotFit[slot] === 'contain' ? 'fit' : 'fill';
+}
+
+function addToOutfit(idx) {
+  if (!activeSlot) { showToast('Tap a slot first', '!'); return; }
+  const item = wardrobe[idx];
+  currentOutfit[activeSlot] = item;
+  slotZoom[activeSlot] = 1; slotFit[activeSlot] = 'contain';
+  const slotEl = document.getElementById('slot-' + activeSlot);
+  let img = slotEl.querySelector('.slot-item-img');
+  const ph = slotEl.querySelector('.slot-ph');
+  if (!img) { img = document.createElement('img'); img.className = 'slot-item-img'; slotEl.insertBefore(img, slotEl.firstChild); }
+  img.style.objectFit = 'contain'; img.style.transform = 'scale(1)';
+  const fitBtn = slotEl.querySelector('.slot-fit-btn');
+  if (fitBtn) fitBtn.textContent = 'fit';
+  if (item.image) { img.src = item.image; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
+  else { if (ph) { ph.style.display = ''; ph.style.opacity = '0.5'; } }
+  slotEl.classList.add('has-item');
+  slotEl.querySelector('.slot-label').textContent = item.name.length > 14 ? item.name.slice(0,13) + '…' : item.name;
+  showToast(item.name + ' added', '✓');
+}
+
+function removeSlot(slot, e) {
+  e.stopPropagation();
+  currentOutfit[slot] = null; slotZoom[slot] = 1; slotFit[slot] = 'contain';
+  const slotEl = document.getElementById('slot-' + slot);
+  const img = slotEl.querySelector('.slot-item-img');
+  if (img) img.remove();
+  const ph = slotEl.querySelector('.slot-ph');
+  if (ph) { ph.style.display = ''; ph.style.opacity = '0.12'; ph.textContent = slotIcons[slot]; }
+  slotEl.querySelector('.slot-label').textContent = slotLabels[slot];
+  slotEl.classList.remove('has-item', 'selected');
+  if (activeSlot === slot) {
+    activeSlot = null;
+    document.getElementById('panel-title').textContent = 'Select a slot above';
+    document.getElementById('panel-subtitle').textContent = 'Tap any slot to see matching pieces';
+    document.getElementById('panel-items').innerHTML = '<div class="panel-prompt">Tap a slot above to begin</div>';
+  }
+  const fitBtn = slotEl.querySelector('.slot-fit-btn');
+  if (fitBtn) fitBtn.textContent = 'fit';
+}
+
+function clearOutfit() {
+  Object.keys(currentOutfit).forEach(slot => { if (currentOutfit[slot]) removeSlot(slot, { stopPropagation:()=>{} }); });
+  activeSlot = null;
+  document.querySelectorAll('.outfit-slot').forEach(s => s.classList.remove('selected'));
+  document.getElementById('panel-title').textContent = 'Select a slot above';
+  document.getElementById('panel-subtitle').textContent = 'Tap any slot to see matching pieces';
+  document.getElementById('panel-items').innerHTML = '<div class="panel-prompt">Tap a slot above to begin</div>';
+}
+
+function saveOutfit(btn) {
+  const name = document.getElementById('outfit-name').value.trim() || 'Look ' + (savedOutfits.length + 1);
+  if (!Object.values(currentOutfit).filter(Boolean).length) { showToast('Add pieces first', '!'); return; }
+  flashBtn(btn, '#1a3a1a', 'white');
+  setTimeout(() => {
+    savedOutfits.unshift({ name, outfit: JSON.parse(JSON.stringify(currentOutfit)), date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'}) });
+    localStorage.setItem('armoire_outfits', JSON.stringify(savedOutfits));
+    document.getElementById('outfit-name').value = '';
+    renderSaved();
+    renderGrid();
+    showToast('"' + name + '" saved', '✓');
+  }, 220);
+}
+
+function renderSaved() {
+  const grid = document.getElementById('saved-grid');
+  document.getElementById('saved-sub').textContent = savedOutfits.length + (savedOutfits.length === 1 ? ' outfit' : ' outfits');
+  if (!savedOutfits.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-state-title">No looks saved yet</div><div class="empty-state-sub">Build your first outfit</div></div>`;
+    return;
+  }
+  grid.innerHTML = savedOutfits.map((s, i) => {
+    const cells = ['top','outerwear','bottom','shoes'].map(k => {
+      const item = s.outfit[k];
+      return item && item.image ? `<div class="saved-cell"><img src="${item.image}"></div>` : `<div class="saved-cell empty"></div>`;
+    }).join('');
+    return `<div class="saved-card" onclick="openLook(${i})">
+      <div class="saved-preview">${cells}</div>
+      <div class="saved-info"><div class="saved-name">${s.name}</div><div class="saved-date">${s.date}</div></div>
+    </div>`;
+  }).join('');
+}
+
+let currentLookIdx = null;
+function openLook(i) {
+  currentLookIdx = i;
+  const s = savedOutfits[i];
+  document.getElementById('look-overlay-name').textContent = s.name;
+  document.getElementById('look-overlay-date').textContent = s.date;
+  const slotOrder = [
+    { key:'outerwear', label:'Outerwear' },
+    { key:'top',       label:'Top' },
+    { key:'bottom',    label:'Bottom / Dress' },
+    { key:'shoes',     label:'Shoes' },
+    { key:'bag',       label:'Bag' }
+  ];
+  const filled = slotOrder.filter(sl => s.outfit[sl.key]);
+  document.getElementById('look-slots-grid').innerHTML = !filled.length
+    ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">No pieces saved</div></div>`
+    : filled.map(sl => {
+        const item = s.outfit[sl.key];
+        return `<div class="look-slot-cell">
+          ${item.image ? `<img src="${item.image}">` : `<div style="width:100%;height:100%;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--mink)">${sl.label}</div>`}
+          <div class="look-slot-label">
+            <div class="look-slot-cat">${sl.label}</div>
+            <div class="look-slot-name">${item.name}</div>
+            ${item.brand ? `<div class="look-slot-brand">${item.brand}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+  document.getElementById('look-overlay').classList.add('open');
+  document.getElementById('look-del-btn').onclick = function() {
+    flashBtn(this, '#6a1818', 'white');
+    setTimeout(() => {
+      showConfirm('Remove this look?', s.name, () => {
+        savedOutfits.splice(currentLookIdx, 1);
+        localStorage.setItem('armoire_outfits', JSON.stringify(savedOutfits));
+        closeAllOverlays();
+        renderSaved();
+        renderGrid();
+        showToast(s.name + ' removed', '✕');
+      });
+    }, 220);
+  };
+}
+
+function closeLook() {
+  document.getElementById('look-overlay').classList.remove('open');
+}
+
+// CHANGE: openModal now accepts an optional preset category
+function openModal(presetCategory) {
+  pendingImage = null;
+  document.getElementById('upload-preview').style.display = 'none';
+  ['item-name','item-brand','item-color'].forEach(id => document.getElementById(id).value = '');
+  const sel = document.getElementById('item-category');
+  sel.selectedIndex = 0;
+  if (presetCategory && presetCategory !== 'All') {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === presetCategory) {
+        sel.selectedIndex = i;
+        break;
+      }
+    }
+  }
+  document.getElementById('modal-add').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-add').classList.remove('open'); }
+
+function previewImg(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    pendingImage = ev.target.result;
+    const p = document.getElementById('upload-preview');
+    p.src = pendingImage; p.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function addItem(btn) {
+  const name = document.getElementById('item-name').value.trim();
+  if (!name) { showToast('Please add a name', '!'); return; }
+  flashBtn(btn, '#1a3a1a', 'white');
+  setTimeout(() => {
+    wardrobe.push({
+      name,
+      brand: document.getElementById('item-brand').value.trim(),
+      category: document.getElementById('item-category').value,
+      color: document.getElementById('item-color').value.trim(),
+      image: pendingImage,
+      id: Date.now()
+    });
+    localStorage.setItem('armoire_wardrobe', JSON.stringify(wardrobe));
+    closeAllOverlays();
+    renderGrid();
+    renderSaved();
+    showToast(name + ' added to wardrobe', '✓');
+  }, 220);
+}
+
+document.getElementById('modal-add').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+renderGrid();
+renderSaved();
+</script>
+</body>
+</html>
