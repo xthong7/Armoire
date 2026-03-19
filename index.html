@@ -235,6 +235,7 @@
 <div class="toast" id="toast"><span class="toast-icon" id="toast-icon"></span><span id="toast-msg"></span></div>
 
 <script>
+// ── STATE ──
 let wardrobe     = JSON.parse(localStorage.getItem('armoire_wardrobe') || '[]');
 let savedOutfits = JSON.parse(localStorage.getItem('armoire_outfits')  || '[]');
 let currentScreen  = 'wardrobe';
@@ -254,6 +255,7 @@ const slotCats   = { outerwear:['Outerwear'], top:['Tops','Knitwear'], bottom:['
 function saveWardrobe() { localStorage.setItem('armoire_wardrobe', JSON.stringify(wardrobe)); }
 function saveOutfits()  { localStorage.setItem('armoire_outfits',  JSON.stringify(savedOutfits)); }
 
+// ── TOAST ──
 function showToast(msg, icon) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent  = msg;
@@ -263,6 +265,7 @@ function showToast(msg, icon) {
   t._timer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
+// ── FLASH ──
 function flashBtn(el, bg, fg) {
   if (!el) return;
   const ob = el.style.background, of = el.style.color;
@@ -273,6 +276,7 @@ function flashBtn(el, bg, fg) {
   setTimeout(() => { el.style.transform = ''; el.style.background = ob; el.style.color = of; }, 220);
 }
 
+// ── CONFIRM ──
 function showConfirm(title, sub, cb) {
   document.getElementById('confirm-title').textContent = title;
   document.getElementById('confirm-sub').textContent   = sub;
@@ -298,59 +302,69 @@ function closeAllOverlays() {
   confirmCallback = null;
 }
 
+// ── NAVIGATION ──
 function showScreen(name, tab) {
   currentScreen = name;
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  if (tab) tab.classList.add('active');
-  else document.getElementById('tab-' + name).classList.add('active');
+  (tab || document.getElementById('tab-' + name)).classList.add('active');
   document.getElementById('app-body').scrollTop = 0;
   if (name === 'wardrobe') renderWardrobe();
   if (name === 'builder')  renderBuilder();
   if (name === 'saved')    renderSaved();
 }
 
+// ── WARDROBE — rewrites app-body completely, same pattern as renderSaved ──
 function renderWardrobe() {
   const filtered = currentFilter === 'All' ? wardrobe : wardrobe.filter(i => i.category === currentFilter);
   const catArg   = currentFilter !== 'All' ? `'${currentFilter}'` : '';
-  let cards = '';
-  filtered.forEach(item => {
-    const ri = wardrobe.indexOf(item);
-    cards += `<div class="item-card">
-      ${item.image
-        ? `<img class="item-img" src="${item.image}">`
-        : `<div class="item-img-placeholder"><svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="12" width="24" height="20" rx="2" stroke="#C4B9AC" stroke-width="1.2"/><path d="M8 17h24M14 12V10a2 2 0 014 0v2" stroke="#C4B9AC" stroke-width="1.2"/></svg></div>`}
-      <div class="item-label">
-        <div class="item-name">${item.name}</div>
-        ${item.brand ? `<div class="item-brand">${item.brand}</div>` : ''}
-      </div>
-      <button class="item-delete" onclick="removeItem(${ri},event)">✕</button>
-    </div>`;
-  });
-  cards += `<div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
-  const emptyMsg = filtered.length === 0 && currentFilter !== 'All'
-    ? `<div class="empty-state"><div class="empty-state-title">No ${currentFilter} yet</div><div class="empty-state-sub">Tap + to add</div></div>`
-    : '';
   const c = wardrobe.length;
+
+  // Build category bar
+  const cats = ['All','Tops','Bottoms','Dresses','Outerwear','Knitwear','Shoes','Bags','Accessories','Swimwear'];
+  const catBar = cats.map(cat =>
+    `<button class="cat-btn${cat === currentFilter ? ' active' : ''}" onclick="filterCat('${cat}')">${cat}</button>`
+  ).join('');
+
+  // Build grid cards
+  let gridHTML = '';
+  if (filtered.length === 0 && currentFilter !== 'All') {
+    gridHTML = `<div class="empty-state">
+      <div class="empty-state-title">No ${currentFilter} yet</div>
+      <div class="empty-state-sub">Tap + to add</div>
+    </div>
+    <div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
+  } else {
+    let cards = '';
+    filtered.forEach(item => {
+      const ri = wardrobe.indexOf(item);
+      cards += `<div class="item-card">
+        ${item.image
+          ? `<img class="item-img" src="${item.image}">`
+          : `<div class="item-img-placeholder"><svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="12" width="24" height="20" rx="2" stroke="#C4B9AC" stroke-width="1.2"/><path d="M8 17h24M14 12V10a2 2 0 014 0v2" stroke="#C4B9AC" stroke-width="1.2"/></svg></div>`}
+        <div class="item-label">
+          <div class="item-name">${item.name}</div>
+          ${item.brand ? `<div class="item-brand">${item.brand}</div>` : ''}
+        </div>
+        <button class="item-delete" onclick="removeItem(${ri},event)">✕</button>
+      </div>`;
+    });
+    cards += `<div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
+    gridHTML = `<div class="clothes-grid">${cards}</div>`;
+  }
+
+  // Write entire screen in one shot — identical pattern to renderSaved
   document.getElementById('app-body').innerHTML = `
     <div class="wardrobe-header">
       <div class="wardrobe-title">My Wardrobe</div>
       <div class="wardrobe-count">${c} ${c === 1 ? 'piece' : 'pieces'}</div>
     </div>
-    <div class="categories-bar">
-      ${['All','Tops','Bottoms','Dresses','Outerwear','Knitwear','Shoes','Bags','Accessories','Swimwear']
-        .map(cat => `<button class="cat-btn${cat === currentFilter ? ' active' : ''}" onclick="filterCat('${cat}')">${cat}</button>`)
-        .join('')}
-    </div>
-    <div style="background:var(--sand)">${
-      emptyMsg
-        ? emptyMsg + `<div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`
-        : `<div class="clothes-grid">${cards}</div>`
-    }</div>`;
+    <div class="categories-bar">${catBar}</div>
+    <div style="background:var(--sand)">${gridHTML}</div>`;
 }
 
 function filterCat(cat) {
   currentFilter = cat;
-  renderWardrobe();
+  renderWardrobe(); // same pattern — full rewrite
 }
 
 function removeItem(idx, e) {
@@ -359,11 +373,12 @@ function removeItem(idx, e) {
   showConfirm('Remove this piece?', name, () => {
     wardrobe.splice(idx, 1);
     saveWardrobe();
-    renderWardrobe();
+    renderWardrobe(); // full rewrite — same as renderSaved after delete
     showToast(name + ' removed', '✕');
   });
 }
 
+// ── MODAL ──
 function openModal(presetCategory) {
   pendingImage = null;
   document.getElementById('upload-preview').style.display = 'none';
@@ -394,23 +409,23 @@ function previewImg(e) {
 function addItem(btn) {
   const name = document.getElementById('item-name').value.trim();
   if (!name) { showToast('Please add a name', '!'); return; }
+  // Push to state immediately — no setTimeout delay
+  wardrobe.push({
+    name,
+    brand:    document.getElementById('item-brand').value.trim(),
+    category: document.getElementById('item-category').value,
+    color:    document.getElementById('item-color').value.trim(),
+    image:    pendingImage,
+    id:       Date.now()
+  });
+  saveWardrobe();
   flashBtn(btn, '#1a3a1a', 'white');
-  setTimeout(() => {
-    wardrobe.push({
-      name,
-      brand:    document.getElementById('item-brand').value.trim(),
-      category: document.getElementById('item-category').value,
-      color:    document.getElementById('item-color').value.trim(),
-      image:    pendingImage,
-      id:       Date.now()
-    });
-    saveWardrobe();
-    closeAllOverlays();
-    renderWardrobe();
-    showToast(name + ' added to wardrobe', '✓');
-  }, 220);
+  closeAllOverlays();
+  renderWardrobe(); // full rewrite immediately — same pattern as renderSaved
+  showToast(name + ' added to wardrobe', '✓');
 }
 
+// ── BUILDER ──
 function renderBuilder() {
   document.getElementById('app-body').innerHTML = `
     <div class="builder-wrap">
@@ -557,6 +572,7 @@ function saveOutfit(btn) {
   }, 220);
 }
 
+// ── SAVED — the working pattern, unchanged ──
 function renderSaved() {
   const c = savedOutfits.length;
   let content = '';
@@ -613,7 +629,7 @@ function openLook(i) {
         savedOutfits.splice(currentLookIdx, 1);
         saveOutfits();
         closeAllOverlays();
-        renderSaved();
+        renderSaved(); // full rewrite — the working pattern
         showToast(s.name + ' removed', '✕');
       });
     }, 220);
