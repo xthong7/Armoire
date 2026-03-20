@@ -244,400 +244,151 @@ let activeSlot     = null;
 let pendingImage   = null;
 let currentLookIdx = null;
 let confirmCallback = null;
-let currentOutfit = { outerwear:null, top:null, bottom:null, shoes:null, bag:null };
-let slotZoom = { outerwear:1, top:1, bottom:1, shoes:1, bag:1 };
-let slotFit  = { outerwear:'contain', top:'contain', bottom:'contain', shoes:'contain', bag:'contain' };
-
-const slotIcons  = { outerwear:'🧥', top:'👚', bottom:'👗', shoes:'👠', bag:'👜' };
-const slotLabels = { outerwear:'Outerwear', top:'Top', bottom:'Bottom / Dress', shoes:'Shoes', bag:'Bag' };
-const slotCats   = { outerwear:['Outerwear'], top:['Tops','Knitwear'], bottom:['Bottoms','Dresses'], shoes:['Shoes'], bag:['Bags','Accessories'] };
 
 function saveWardrobe() { localStorage.setItem('armoire_wardrobe', JSON.stringify(wardrobe)); }
 function saveOutfits()  { localStorage.setItem('armoire_outfits',  JSON.stringify(savedOutfits)); }
 
-// ── TOAST ──
-function showToast(msg, icon) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent  = msg;
-  document.getElementById('toast-icon').textContent = icon || '';
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 2400);
-}
-
-// ── FLASH ──
-function flashBtn(el, bg, fg) {
-  if (!el) return;
-  const ob = el.style.background, of = el.style.color;
-  el.style.transition = 'background 0.08s, transform 0.08s, color 0.08s';
-  el.style.transform = 'scale(0.94)';
-  el.style.background = bg || '#1a3a1a';
-  el.style.color = fg || 'white';
-  setTimeout(() => { el.style.transform = ''; el.style.background = ob; el.style.color = of; }, 220);
-}
-
-// ── CONFIRM ──
-function showConfirm(title, sub, cb) {
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-sub').textContent   = sub;
-  confirmCallback = cb;
-  document.getElementById('confirm-overlay').classList.add('open');
-}
-function closeConfirm() {
-  document.getElementById('confirm-overlay').classList.remove('open');
-  confirmCallback = null;
-}
-document.getElementById('confirm-ok').addEventListener('click', () => {
-  flashBtn(document.getElementById('confirm-ok'), '#6a1818', 'white');
-  setTimeout(() => { if (confirmCallback) confirmCallback(); closeConfirm(); }, 220);
-});
-document.getElementById('confirm-overlay').addEventListener('click', function(e) {
-  if (e.target === this) closeConfirm();
-});
-
-function closeAllOverlays() {
-  document.getElementById('modal-add').classList.remove('open');
-  document.getElementById('confirm-overlay').classList.remove('open');
-  document.getElementById('look-overlay').classList.remove('open');
-  confirmCallback = null;
-}
-
-// ── NAVIGATION ──
-function showScreen(name, tab) {
-  currentScreen = name;
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  (tab || document.getElementById('tab-' + name)).classList.add('active');
-  document.getElementById('app-body').scrollTop = 0;
-  if (name === 'wardrobe') renderWardrobe();
-  if (name === 'builder')  renderBuilder();
-  if (name === 'saved')    renderSaved();
-}
-
-// ── WARDROBE — rewrites app-body completely, same pattern as renderSaved ──
-function renderWardrobe() {
-  const filtered = currentFilter === 'All' ? wardrobe : wardrobe.filter(i => i.category === currentFilter);
-  const catArg   = currentFilter !== 'All' ? `'${currentFilter}'` : '';
-  const c = wardrobe.length;
-
-  // Build category bar
-  const cats = ['All','Tops','Bottoms','Dresses','Outerwear','Knitwear','Shoes','Bags','Accessories','Swimwear'];
-  const catBar = cats.map(cat =>
-    `<button class="cat-btn${cat === currentFilter ? ' active' : ''}" onclick="filterCat('${cat}')">${cat}</button>`
-  ).join('');
-
-  // Build grid cards
-  let gridHTML = '';
-  if (filtered.length === 0 && currentFilter !== 'All') {
-    gridHTML = `<div class="empty-state">
-      <div class="empty-state-title">No ${currentFilter} yet</div>
-      <div class="empty-state-sub">Tap + to add</div>
-    </div>
-    <div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
-  } else {
-    let cards = '';
-    filtered.forEach(item => {
-      const ri = wardrobe.indexOf(item);
-      cards += `<div class="item-card">
-        ${item.image
-          ? `<img class="item-img" src="${item.image}">`
-          : `<div class="item-img-placeholder"><svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="12" width="24" height="20" rx="2" stroke="#C4B9AC" stroke-width="1.2"/><path d="M8 17h24M14 12V10a2 2 0 014 0v2" stroke="#C4B9AC" stroke-width="1.2"/></svg></div>`}
-        <div class="item-label">
-          <div class="item-name">${item.name}</div>
-          ${item.brand ? `<div class="item-brand">${item.brand}</div>` : ''}
-        </div>
-        <button class="item-delete" onclick="removeItem(${ri},event)">✕</button>
-      </div>`;
-    });
-    cards += `<div class="add-card" onclick="openModal(${catArg})"><div class="add-icon">+</div><div class="add-label">Add piece</div></div>`;
-    gridHTML = `<div class="clothes-grid">${cards}</div>`;
-  }
-
-  // Write entire screen in one shot — identical pattern to renderSaved
-  document.getElementById('app-body').innerHTML = `
-    <div class="wardrobe-header">
-      <div class="wardrobe-title">My Wardrobe</div>
-      <div class="wardrobe-count">${c} ${c === 1 ? 'piece' : 'pieces'}</div>
-    </div>
-    <div class="categories-bar">${catBar}</div>
-    <div style="background:var(--sand)">${gridHTML}</div>`;
-}
-
-function filterCat(cat) {
-  currentFilter = cat;
-  renderWardrobe(); // same pattern — full rewrite
-}
-
-function removeItem(idx, e) {
-  e.stopPropagation();
-  const name = wardrobe[idx].name;
-  showConfirm('Remove this piece?', name, () => {
-    wardrobe.splice(idx, 1);
-    saveWardrobe();
-    renderWardrobe(); // full rewrite — same as renderSaved after delete
-    showToast(name + ' removed', '✕');
+// ── SMOOTH UI REFRESH (FIX #1) ──
+function refreshUI() {
+  requestAnimationFrame(() => {
+    if (currentScreen === 'wardrobe') renderWardrobe();
+    if (currentScreen === 'builder') renderBuilder();
+    if (currentScreen === 'saved') renderSaved();
   });
 }
 
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── BUTTON FEEDBACK (FIX #3) ──
+function flashBtn(el) {
+  if (!el) return;
+  el.style.transform = 'scale(0.94)';
+  el.style.opacity = '0.6';
+  setTimeout(() => {
+    el.style.transform = '';
+    el.style.opacity = '';
+  }, 150);
+}
+
+// Apply feedback to ALL buttons
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  flashBtn(btn);
+});
+
+// ── LOADING STATE (NEW) ──
+function setLoading(btn, text = "Loading...") {
+  btn.disabled = true;
+  btn.dataset.original = btn.innerText;
+  btn.innerText = text;
+}
+
+function clearLoading(btn) {
+  btn.disabled = false;
+  btn.innerText = btn.dataset.original;
+}
+
+// ── NAV ──
+function showScreen(name) {
+  currentScreen = name;
+  if (name === 'wardrobe') renderWardrobe();
+  if (name === 'builder') renderBuilder();
+  if (name === 'saved') renderSaved();
+}
+
+// ── WARDROBE ──
+function renderWardrobe() {
+  const container = document.getElementById('app-body');
+
+  container.innerHTML = `
+    <div style="padding:20px">
+      <h2>My Wardrobe (${wardrobe.length})</h2>
+      <button onclick="openModal()">+ Add Item</button>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px">
+        ${wardrobe.map((item, i) => `
+          <div style="border:1px solid #ddd;padding:10px;position:relative;animation:fadeIn 0.2s ease">
+            ${item.image ? `<img src="${item.image}" style="width:100%">` : ''}
+            <div>${item.name}</div>
+            <button onclick="removeItem(${i})" style="position:absolute;top:5px;right:5px">✕</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ── ADD ITEM (FIX #2 + loading + instant UI) ──
+function addItem(btn) {
+  const name = document.getElementById('item-name').value.trim();
+  if (!name) return showToast("Add a name");
+
+  setLoading(btn, "Adding...");
+
+  setTimeout(() => {
+    wardrobe.push({
+      name,
+      image: pendingImage,
+      id: Date.now()
+    });
+
+    saveWardrobe();
+
+    closeModal(); // ✅ auto close
+    pendingImage = null;
+
+    clearLoading(btn);
+    refreshUI(); // ✅ instant UI
+
+    showToast("Added");
+  }, 200);
+}
+
+// ── REMOVE ITEM (FIX #1) ──
+function removeItem(i) {
+  wardrobe.splice(i, 1);
+  saveWardrobe();
+  refreshUI();
+  showToast("Removed");
+}
+
 // ── MODAL ──
-function openModal(presetCategory) {
-  pendingImage = null;
-  document.getElementById('upload-preview').style.display = 'none';
-  ['item-name','item-brand','item-color'].forEach(id => document.getElementById(id).value = '');
-  const sel = document.getElementById('item-category');
-  sel.selectedIndex = 0;
-  if (presetCategory && presetCategory !== 'All') {
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === presetCategory) { sel.selectedIndex = i; break; }
-    }
-  }
+function openModal() {
   document.getElementById('modal-add').classList.add('open');
 }
-function closeModal() { document.getElementById('modal-add').classList.remove('open'); }
-document.getElementById('modal-add').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
+function closeModal() {
+  document.getElementById('modal-add').classList.remove('open');
+}
+
+// ── IMAGE PREVIEW ──
 function previewImg(e) {
-  const file = e.target.files[0]; if (!file) return;
+  const file = e.target.files[0];
   const reader = new FileReader();
   reader.onload = ev => {
     pendingImage = ev.target.result;
-    const p = document.getElementById('upload-preview');
-    p.src = pendingImage; p.style.display = 'block';
+    document.getElementById('upload-preview').src = pendingImage;
+    document.getElementById('upload-preview').style.display = 'block';
   };
   reader.readAsDataURL(file);
 }
 
-function addItem(btn) {
-  const name = document.getElementById('item-name').value.trim();
-  if (!name) { showToast('Please add a name', '!'); return; }
-  // Push to state immediately — no setTimeout delay
-  wardrobe.push({
-    name,
-    brand:    document.getElementById('item-brand').value.trim(),
-    category: document.getElementById('item-category').value,
-    color:    document.getElementById('item-color').value.trim(),
-    image:    pendingImage,
-    id:       Date.now()
-  });
-  saveWardrobe();
-  flashBtn(btn, '#1a3a1a', 'white');
-  closeAllOverlays();
-  renderWardrobe(); // full rewrite immediately — same pattern as renderSaved
-  showToast(name + ' added to wardrobe', '✓');
-}
+// ── SIMPLE ANIMATION (NEW) ──
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(5px); }
+  to { opacity:1; transform:translateY(0); }
+}`;
+document.head.appendChild(style);
 
-// ── BUILDER ──
-function renderBuilder() {
-  document.getElementById('app-body').innerHTML = `
-    <div class="builder-wrap">
-      <div class="builder-header">
-        <div class="builder-title">Outfit Builder</div>
-        <div class="builder-sub">Tap a slot to choose pieces for it</div>
-      </div>
-      <div class="outfit-canvas">
-        <div class="outfit-row row-2">${buildSlot('outerwear')}${buildSlot('top')}</div>
-        <div class="outfit-row row-1">${buildSlot('bottom')}</div>
-        <div class="outfit-row row-2">${buildSlot('shoes')}${buildSlot('bag')}</div>
-      </div>
-      <div class="panel-section">
-        <div class="panel-title" id="panel-title">Select a slot above</div>
-        <div class="panel-subtitle" id="panel-subtitle">Tap any slot to see matching pieces</div>
-        <div class="panel-items-row" id="panel-items"><div class="panel-prompt">Tap a slot above to begin</div></div>
-      </div>
-      <div class="save-row">
-        <input class="save-input" id="outfit-name" placeholder="Name this look...">
-        <button class="btn-clear" onclick="clearOutfit()">Clear</button>
-        <button class="btn-save" onclick="saveOutfit(this)">Save</button>
-      </div>
-    </div>`;
-  Object.keys(currentOutfit).forEach(slot => {
-    if (currentOutfit[slot]) restoreSlot(slot, currentOutfit[slot]);
-  });
-  if (activeSlot) {
-    const el = document.getElementById('slot-' + activeSlot);
-    if (el) { el.classList.add('selected'); renderSlotPanel(activeSlot); }
-  }
-}
-
-function buildSlot(slot) {
-  return `<div class="outfit-slot" id="slot-${slot}" onclick="setActiveSlot('${slot}',this)">
-    <span class="slot-label">${slotLabels[slot]}</span>
-    <div class="slot-ph">${slotIcons[slot]}</div>
-    <button class="slot-remove" onclick="removeSlot('${slot}',event)">✕</button>
-    <div class="slot-zoom-controls">
-      <button class="slot-zoom-btn" onclick="zoomSlot('${slot}',-0.2,event)">−</button>
-      <button class="slot-fit-btn" onclick="toggleFit('${slot}',event)">fit</button>
-      <button class="slot-zoom-btn" onclick="zoomSlot('${slot}',0.2,event)">+</button>
-    </div>
-  </div>`;
-}
-
-function restoreSlot(slot, item) {
-  const slotEl = document.getElementById('slot-' + slot);
-  if (!slotEl) return;
-  const ph = slotEl.querySelector('.slot-ph');
-  let img = slotEl.querySelector('.slot-item-img');
-  if (!img) { img = document.createElement('img'); img.className = 'slot-item-img'; slotEl.insertBefore(img, slotEl.firstChild); }
-  img.style.objectFit = slotFit[slot];
-  img.style.transform = 'scale(' + slotZoom[slot] + ')';
-  const fitBtn = slotEl.querySelector('.slot-fit-btn');
-  if (fitBtn) fitBtn.textContent = slotFit[slot] === 'contain' ? 'fit' : 'fill';
-  if (item.image) { img.src = item.image; img.style.display = 'block'; if (ph) ph.style.display = 'none'; }
-  else { if (ph) { ph.style.display = ''; ph.style.opacity = '0.5'; } }
-  slotEl.classList.add('has-item');
-  slotEl.querySelector('.slot-label').textContent = item.name.length > 14 ? item.name.slice(0,13) + '…' : item.name;
-}
-
-function setActiveSlot(slot, el) {
-  activeSlot = slot;
-  document.querySelectorAll('.outfit-slot').forEach(s => s.classList.remove('selected'));
-  el.classList.add('selected');
-  renderSlotPanel(slot);
-}
-
-function renderSlotPanel(slot) {
-  const allowed  = slotCats[slot];
-  const filtered = wardrobe.filter(i => allowed.includes(i.category));
-  document.getElementById('panel-title').textContent    = slotLabels[slot];
-  document.getElementById('panel-subtitle').textContent = 'Showing: ' + allowed.join(' / ');
-  const panel = document.getElementById('panel-items');
-  if (!filtered.length) { panel.innerHTML = `<span class="panel-empty">No ${allowed.join(' / ')} in wardrobe yet</span>`; return; }
-  panel.innerHTML = filtered.map(item => {
-    const ri = wardrobe.indexOf(item);
-    return `<div class="panel-item" onclick="addToOutfit(${ri})">
-      ${item.image ? `<img src="${item.image}">` : `<div style="width:100%;height:100%;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.2">◻</div>`}
-      <div class="panel-item-label">${item.name}</div>
-    </div>`;
-  }).join('');
-}
-
-function zoomSlot(slot, delta, e) {
-  e.stopPropagation();
-  slotZoom[slot] = Math.min(3, Math.max(0.5, slotZoom[slot] + delta));
-  const img = document.querySelector('#slot-' + slot + ' .slot-item-img');
-  if (img) img.style.transform = 'scale(' + slotZoom[slot] + ')';
-}
-
-function toggleFit(slot, e) {
-  e.stopPropagation();
-  slotFit[slot] = slotFit[slot] === 'contain' ? 'cover' : 'contain';
-  const img = document.querySelector('#slot-' + slot + ' .slot-item-img');
-  const btn = document.querySelector('#slot-' + slot + ' .slot-fit-btn');
-  if (img) img.style.objectFit = slotFit[slot];
-  if (btn) btn.textContent = slotFit[slot] === 'contain' ? 'fit' : 'fill';
-}
-
-function addToOutfit(idx) {
-  if (!activeSlot) { showToast('Tap a slot first', '!'); return; }
-  const item = wardrobe[idx];
-  currentOutfit[activeSlot] = item;
-  slotZoom[activeSlot] = 1; slotFit[activeSlot] = 'contain';
-  restoreSlot(activeSlot, item);
-  showToast(item.name + ' added', '✓');
-}
-
-function removeSlot(slot, e) {
-  e.stopPropagation();
-  currentOutfit[slot] = null; slotZoom[slot] = 1; slotFit[slot] = 'contain';
-  const slotEl = document.getElementById('slot-' + slot);
-  const img = slotEl.querySelector('.slot-item-img');
-  if (img) img.remove();
-  const ph = slotEl.querySelector('.slot-ph');
-  if (ph) { ph.style.display = ''; ph.style.opacity = '0.12'; ph.textContent = slotIcons[slot]; }
-  slotEl.querySelector('.slot-label').textContent = slotLabels[slot];
-  slotEl.classList.remove('has-item', 'selected');
-  if (activeSlot === slot) {
-    activeSlot = null;
-    document.getElementById('panel-title').textContent    = 'Select a slot above';
-    document.getElementById('panel-subtitle').textContent = 'Tap any slot to see matching pieces';
-    document.getElementById('panel-items').innerHTML      = '<div class="panel-prompt">Tap a slot above to begin</div>';
-  }
-  const fitBtn = slotEl.querySelector('.slot-fit-btn');
-  if (fitBtn) fitBtn.textContent = 'fit';
-}
-
-function clearOutfit() {
-  Object.keys(currentOutfit).forEach(slot => { if (currentOutfit[slot]) removeSlot(slot, { stopPropagation:()=>{} }); });
-  activeSlot = null;
-}
-
-function saveOutfit(btn) {
-  const name = document.getElementById('outfit-name').value.trim() || 'Look ' + (savedOutfits.length + 1);
-  if (!Object.values(currentOutfit).filter(Boolean).length) { showToast('Add pieces first', '!'); return; }
-  flashBtn(btn, '#1a3a1a', 'white');
-  setTimeout(() => {
-    savedOutfits.unshift({ name, outfit: JSON.parse(JSON.stringify(currentOutfit)), date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'}) });
-    saveOutfits();
-    document.getElementById('outfit-name').value = '';
-    showToast('"' + name + '" saved', '✓');
-  }, 220);
-}
-
-// ── SAVED — the working pattern, unchanged ──
-function renderSaved() {
-  const c = savedOutfits.length;
-  let content = '';
-  if (!c) {
-    content = `<div class="empty-state"><div class="empty-state-title">No looks saved yet</div><div class="empty-state-sub">Build your first outfit</div></div>`;
-  } else {
-    content = savedOutfits.map((s, i) => {
-      const cells = ['top','outerwear','bottom','shoes'].map(k => {
-        const item = s.outfit[k];
-        return item && item.image ? `<div class="saved-cell"><img src="${item.image}"></div>` : `<div class="saved-cell empty"></div>`;
-      }).join('');
-      return `<div class="saved-card" onclick="openLook(${i})">
-        <div class="saved-preview">${cells}</div>
-        <div class="saved-info"><div class="saved-name">${s.name}</div><div class="saved-date">${s.date}</div></div>
-      </div>`;
-    }).join('');
-  }
-  document.getElementById('app-body').innerHTML = `
-    <div class="saved-header">
-      <div class="saved-title">Saved Looks</div>
-      <div class="saved-sub">${c} ${c === 1 ? 'outfit' : 'outfits'}</div>
-    </div>
-    <div style="background:var(--sand)"><div class="saved-grid">${content}</div></div>`;
-}
-
-function openLook(i) {
-  currentLookIdx = i;
-  const s = savedOutfits[i];
-  document.getElementById('look-overlay-name').textContent = s.name;
-  document.getElementById('look-overlay-date').textContent = s.date;
-  const slotOrder = [
-    {key:'outerwear',label:'Outerwear'},{key:'top',label:'Top'},
-    {key:'bottom',label:'Bottom / Dress'},{key:'shoes',label:'Shoes'},{key:'bag',label:'Bag'}
-  ];
-  const filled = slotOrder.filter(sl => s.outfit[sl.key]);
-  document.getElementById('look-slots-grid').innerHTML = !filled.length
-    ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">No pieces saved</div></div>`
-    : filled.map(sl => {
-        const item = s.outfit[sl.key];
-        return `<div class="look-slot-cell">
-          ${item.image ? `<img src="${item.image}">` : `<div style="width:100%;height:100%;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--mink)">${sl.label}</div>`}
-          <div class="look-slot-label">
-            <div class="look-slot-cat">${sl.label}</div>
-            <div class="look-slot-name">${item.name}</div>
-            ${item.brand ? `<div class="look-slot-brand">${item.brand}</div>` : ''}
-          </div>
-        </div>`;
-      }).join('');
-  document.getElementById('look-overlay').classList.add('open');
-  document.getElementById('look-del-btn').onclick = function() {
-    flashBtn(this, '#6a1818', 'white');
-    setTimeout(() => {
-      showConfirm('Remove this look?', s.name, () => {
-        savedOutfits.splice(currentLookIdx, 1);
-        saveOutfits();
-        closeAllOverlays();
-        renderSaved(); // full rewrite — the working pattern
-        showToast(s.name + ' removed', '✕');
-      });
-    }, 220);
-  };
-}
-
-function closeLook() { document.getElementById('look-overlay').classList.remove('open'); }
-
+// INIT
 showScreen('wardrobe');
 </script>
 </body>
